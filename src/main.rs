@@ -4,11 +4,12 @@ mod environment;
 
 use environment::Environment;
 
-const NUM_X_CELLS: u32 = 15;
-const NUM_Y_CELLS: u32 = 15;
+const NUM_X_CELLS: u32 = 4;
+const NUM_Y_CELLS: u32 = 4;
 const X_OFFSET: u32 = 50;
 const Y_OFFSET: u32 = 50;
 const CELL_SIZE: u32 = 100;
+const TIME_STEP: bool = false;
 
 fn main() {
 	let x_dimension = NUM_X_CELLS * CELL_SIZE + 2 * X_OFFSET;
@@ -36,18 +37,39 @@ impl Main {
 // Converged after 379 steps.
 // Converged after 184 steps.
 impl WindowHandler for Main {
-	fn on_draw(self: &mut Main, helper: &mut WindowHelper, graphics: &mut Graphics2D) {
+	fn on_draw(
+		self: &mut Main,
+		helper: &mut WindowHelper, 
+		graphics: &mut Graphics2D
+	) {
 		if self.converged == false {
 			graphics.clear_screen(Color::BLACK);
-			self.converged = self.environment.act();
-			self.environment.draw(graphics);
-			if self.converged {
-				println!("Converged after {} steps.", self.steps);
-			} else {
-				println!("Steps: {}", self.steps);
+			if TIME_STEP == false {
+				self.converged = self.environment.act();
+				if self.converged {
+					println!("Converged after {} steps.", self.steps);
+				} else {
+					println!("Steps: {}", self.steps);
+				}
+				self.steps += 1;
 			}
-			self.steps += 1;
+			self.environment.draw(graphics);
 			helper.request_redraw();
 		}
+	}
+
+	fn on_key_down(
+		&mut self,
+		helper: &mut WindowHelper<()>,
+		virtual_key_code: Option<speedy2d::window::VirtualKeyCode>,
+		scancode: speedy2d::window::KeyScancode
+	) {
+		self.converged = self.environment.act();
+		if self.converged {
+			println!("Converged after {} steps.", self.steps);
+		} else {
+			println!("Steps: {}", self.steps);
+		}
+		self.steps += 1;
 	}
 }

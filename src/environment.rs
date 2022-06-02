@@ -1,19 +1,32 @@
 use speedy2d::{Graphics2D, color::Color, font::{Font, TextOptions, TextLayout}};
 
-const POLICY: Policy = Policy::Iterative; 
-const IMPROVE_POLICY: bool = true;
-
 #[derive(PartialEq)]
 pub enum Policy {
 	Iterative,
 	IterativeInPlace,
 }
 
+const POLICY: Policy = Policy::Iterative; 
+const IMPROVE_POLICY: bool = false;
+
 #[derive(Copy, Clone)]
+struct ActionValues {
+	reward: f32,
+	probability: f32,
+}
+
+#[derive(Copy, Clone)]
+enum Action {
+	Up(ActionValues),
+	Right(ActionValues),
+	Down(ActionValues), 
+	Left(ActionValues),
+}
+
 pub struct State {
 	row: u32,
 	col: u32,
-	reward: f32,
+	actions: Vec<Action>,
 	value: f32,
 	next_value: f32,
 	max_value: f32,
@@ -44,17 +57,7 @@ impl Environment {
 		let bytes = include_bytes!("../assets/fonts/ariel.ttf");
 		let font = Font::new(bytes).unwrap();
 
-		let mut states = vec![];
-
-		for row in 0..num_cols {
-			let mut s: Vec<State> = Vec::new();
-			for col in 0..num_rows  {
-				s.push(State { reward: 0.0, value: 0.0, next_value: 0.0, row: row, col: col, max_value: 0.0 });
-			}
-			states.push(s);
-		}
-
-		states[0][0].reward = 1.0;
+		let states = Environment::initialize_states(num_rows, num_cols);
 
         Self { 
             x_offset,
@@ -66,6 +69,36 @@ impl Environment {
 			states,
 		}
 	}  
+
+	fn initialize_states(num_rows: u32, num_cols: u32) -> Vec<Vec<State>> {
+		let mut states = vec![];
+
+		for row in 0..num_rows {
+			let mut s: Vec<State> = Vec::new();
+			for col in 0..num_cols  {
+				s.push(State { 
+					row: row, 
+					col: col, 
+					actions: vec![
+						Action::Up(ActionValues { probability: 0.25, reward: -1.0 }), 
+						Action::Right(ActionValues { probability: 0.25, reward: -1.0 }), 
+						Action::Down(ActionValues { probability: 0.25, reward: -1.0 }), 
+						Action::Left(ActionValues { probability: 0.25, reward: -1.0 }),
+					],
+					value: 0.0, 
+					next_value: 0.0, 
+					max_value: 0.0
+				});
+			}
+			states.push(s);
+		}
+
+		// initialize terminal states
+		states[0][0].actions = vec![];
+		states[3][3].actions = vec![];
+
+		states
+	}
 
 	pub fn act(&mut self) -> bool {
 		let mut converged: bool = true;
@@ -127,33 +160,47 @@ impl Environment {
 	fn get_next_value(&mut self, col: u32, row: u32) -> f32 {
 		let col = col as usize;
 		let row = row as usize;
+		let state = &self.states[row][col];
 
-		let mut l: f32 = 0.0;
-		let mut u: f32 = 0.0;
-		let mut r: f32 = 0.0;
-		let mut d: f32 = 0.0;
-
-		if col != 0 { 
-			l = self.states[col - 1][row].value;
+		let mut value = 0.0;
+		for action in &state.actions {
+			value += match action {
+				Action::Up(av) => {
+					if row == 0 {
+						av.probability * (av.reward + state.value)
+					}
+					else {
+						av.probability * (av.reward + self.states[col][row - 1].value)
+					}	
+				},
+				Action::Right(av) => {
+					if col == (self.num_cols - 1) as usize {
+						av.probability * (av.reward + state.value)
+					}
+					else {
+						av.probability * (av.reward + self.states[col + 1][row].value)
+					}	
+				},
+				Action::Down(av) => {
+					if row == (self.num_rows - 1) as usize {
+						av.probability * (av.reward + state.value)
+					}
+					else {
+						av.probability * (av.reward + self.states[col][row + 1].value)
+					}	
+				},
+				Action::Left(av) => {
+					if col == 0 as usize {
+						av.probability * (av.reward + state.value)
+					}
+					else {
+						av.probability * (av.reward + self.states[col - 1][row].value)
+					}	
+				},
+			}
 		}
 
-		if row != 0 {
-			u = self.states[col][row - 1].value;
-		}
-
-		if col < (self.num_rows - 1) as usize { 
-			r = self.states[col + 1][row].value;
-		}
-
-		if row < (self.num_cols - 1) as usize {
-			d = self.states[col][row + 1].value;
-		}
-
-		let reward = self.states[col][row].reward as f32;
-		let sum = (l + u + r + d) as f32;
-		let next_value = reward + sum / 4.0;
-					
-		next_value
+		value
 	}
 
 	fn get_max_value(&mut self, col: u32, row: u32) -> f32 {
@@ -181,9 +228,9 @@ impl Environment {
 			d = self.states[col][row + 1].value;
 		}
 
-		let reward = self.states[col][row].reward as f32;
+		// let reward = self.states[col][row].reward as f32;
 
-		let next_value = reward + (u.max(r).max(d).max(l) / 4.0);
+		let next_value = u.max(r).max(d).max(l);
 		
 		next_value
 	}
