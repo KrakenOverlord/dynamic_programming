@@ -4,14 +4,11 @@ mod environment;
 
 use environment::Environment;
 
-const NUM_X_CELLS: u32 = 10;
-const NUM_Y_CELLS: u32 = 10;
+const NUM_X_CELLS: u32 = 15;
+const NUM_Y_CELLS: u32 = 15;
 const X_OFFSET: u32 = 50;
 const Y_OFFSET: u32 = 50;
-const CELL_SIZE: u32 = 70;
-
-const UPDATE_IN_PLACE: bool = true;
-
+const CELL_SIZE: u32 = 100;
 
 fn main() {
 	let x_dimension = NUM_X_CELLS * CELL_SIZE + 2 * X_OFFSET;
@@ -30,7 +27,7 @@ impl Main {
     pub fn new() -> Self {
         Self { 
 			steps: 0,
-        	environment: Environment::new(X_OFFSET, Y_OFFSET, NUM_X_CELLS, NUM_Y_CELLS, CELL_SIZE, UPDATE_IN_PLACE),
+        	environment: Environment::new(X_OFFSET, Y_OFFSET, NUM_X_CELLS, NUM_Y_CELLS, CELL_SIZE),
 			converged: false,
     	}
 	}
