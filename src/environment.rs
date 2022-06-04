@@ -7,15 +7,15 @@ pub enum Policy {
 }
 
 const POLICY: Policy = Policy::Iterative; 
-const IMPROVE_POLICY: bool = false;
+const IMPROVE_POLICY: bool = true;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct ActionValues {
 	reward: f32,
 	probability: f32,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 enum Action {
 	Up(ActionValues),
 	Right(ActionValues),
@@ -27,18 +27,38 @@ pub struct State {
 	row: u32,
 	col: u32,
 	actions: Vec<Action>,
+	policy: Action,
 	value: f32,
 	next_value: f32,
-	max_value: f32,
 }
 
 impl State {
+	fn terminal(&self) -> bool {
+		self.actions.len() == 0
+	}
+
 	pub fn draw(&self, graphics: &mut Graphics2D, font: &Font, x_offset: u32, y_offset: u32, cell_size: u32) {
-		let text = format!("{:.4}", self.value);
-		let block = font.layout_text(&text, 0.4 * cell_size as f32, TextOptions::new());
-		let x = x_offset as f32 + self.row as f32 * cell_size as f32 + 0.5 * cell_size as f32 - 0.5 * block.width();
-		let y = y_offset as f32 + self.col as f32 * cell_size as f32 + 0.5 * cell_size as f32 - 0.5 * block.height();
-		graphics.draw_text((x.round(), y.round()), Color::WHITE, &block);
+		// draw policy
+		if self.terminal() == false {
+			let policy = match self.policy {
+				Action::Up(_) => "U",
+				Action::Right(_) => "R",
+				Action::Down(_) => "D",
+				Action::Left(_) => "L",
+			};
+			let policy_text = format!("{}{}:{}", self.row, self.col, policy);
+			let value_block = font.layout_text(&policy_text, 0.4 * cell_size as f32, TextOptions::new());
+			let x = x_offset as f32 + self.col as f32 * cell_size as f32 + 0.5 * cell_size as f32 - 0.5 * value_block.width();
+			let y = y_offset as f32 + self.row as f32 * cell_size as f32 + 0.5 * cell_size as f32 - value_block.height();
+			graphics.draw_text((x.round(), y.round()), Color::WHITE, &value_block);
+		}
+
+		// draw value
+		let value_text = format!("{:.4}", self.value);
+		let value_block = font.layout_text(&value_text, 0.4 * cell_size as f32, TextOptions::new());
+		let x = x_offset as f32 + self.col as f32 * cell_size as f32 + 0.5 * cell_size as f32 - 0.5 * value_block.width();
+		let y = y_offset as f32 + self.row as f32 * cell_size as f32 + 0.5 * cell_size as f32 - 0.25 * value_block.height();
+		graphics.draw_text((x.round(), y.round()), Color::WHITE, &value_block);
 	}
 }
 
@@ -87,7 +107,7 @@ impl Environment {
 					],
 					value: 0.0, 
 					next_value: 0.0, 
-					max_value: 0.0
+					policy: Action::Up(ActionValues { probability: 0.0, reward: 0.0 }),
 				});
 			}
 			states.push(s);
@@ -105,8 +125,12 @@ impl Environment {
 
 		// Update every state
 		for row in 0..self.num_rows {
-			for col in 0..self.num_rows {
-				let next_value = self.get_next_value(row, col);
+			for col in 0..self.num_cols {
+				let state = &self.states[row as usize][col as usize];
+				if state.terminal() {
+					continue;
+				}
+				let next_value = self.get_next_value(state);
 
 				// Did we converge?
 				if self.states[row as usize][col as usize].value != next_value {
@@ -133,106 +157,96 @@ impl Environment {
 			}
 		}
 
-		// calculate maxes
 		if IMPROVE_POLICY {
-			converged = true;
-
 			for row in 0..self.num_rows {
-				for col in 0..self.num_rows {
-					self.states[row as usize][col as usize].max_value = self.get_max_value(col, row);
-				}
-			}
-
-			for row in 0..self.num_rows {
-				for col in 0..self.num_rows {
-					let max_value = self.states[row as usize][col as usize].max_value;
-					if max_value != self.states[row as usize][col as usize].value {
-						converged = false;
-						self.states[row as usize][col as usize].value = max_value;
+				for col in 0..self.num_cols {
+					let row = row as usize;
+					let col = col as usize;
+					let state = &self.states[row][col];
+					if state.terminal() {
+						continue;
 					}
-				}
+
+					match self.get_greedy_action(state) {
+						Some(a) => {
+							self.states[row][col].policy = a;
+						},
+						None => (),
+					}
+				} 
 			}
 		}
 
 		converged
 	}
 
-	fn get_next_value(&mut self, col: u32, row: u32) -> f32 {
-		let col = col as usize;
-		let row = row as usize;
-		let state = &self.states[row][col];
-
+	fn get_next_value(& self, state: &State) -> f32 {
 		let mut value = 0.0;
 		for action in &state.actions {
-			value += match action {
-				Action::Up(av) => {
-					if row == 0 {
-						av.probability * (av.reward + state.value)
-					}
-					else {
-						av.probability * (av.reward + self.states[col][row - 1].value)
-					}	
-				},
-				Action::Right(av) => {
-					if col == (self.num_cols - 1) as usize {
-						av.probability * (av.reward + state.value)
-					}
-					else {
-						av.probability * (av.reward + self.states[col + 1][row].value)
-					}	
-				},
-				Action::Down(av) => {
-					if row == (self.num_rows - 1) as usize {
-						av.probability * (av.reward + state.value)
-					}
-					else {
-						av.probability * (av.reward + self.states[col][row + 1].value)
-					}	
-				},
-				Action::Left(av) => {
-					if col == 0 as usize {
-						av.probability * (av.reward + state.value)
-					}
-					else {
-						av.probability * (av.reward + self.states[col - 1][row].value)
-					}	
-				},
-			}
+			value += self.get_action_value(state, action);
 		}
 
 		value
 	}
 
-	fn get_max_value(&mut self, col: u32, row: u32) -> f32 {
-		let col = col as usize;
-		let row = row as usize;
-
-		let mut l: f32 = 0.0;
-		let mut u: f32 = 0.0;
-		let mut r: f32 = 0.0;
-		let mut d: f32 = 0.0;
-
-		if col != 0 { 
-			l = self.states[col - 1][row].value;
+	fn get_greedy_action(&self, state: &State) -> Option<Action> {
+		if state.actions.len() == 0 {
+			return None;
 		}
 
-		if row != 0 {
-			u = self.states[col][row - 1].value;
+		let first_action = state.actions.first().unwrap();
+		let mut value = self.get_action_value(state, first_action);
+		let mut greedy_action = first_action;
+		for action in &state.actions {
+			let current_value = self.get_action_value(state, action);
+			println!("Action = {:?} => {}", action, current_value); 
+
+			if current_value > value {
+				println!("Upgrading Action = {:?} => {} > {}", action, current_value, value); 
+				greedy_action = action;
+				value = current_value;
+			}
 		}
+		println!("Greedy Action = {:?}", greedy_action); 
 
-		if col < (self.num_rows - 1) as usize { 
-			r = self.states[col + 1][row].value;
+		Some(greedy_action.clone())
+	}
+
+	fn get_action_value(&self, state: &State, action: &Action) -> f32 {
+		match action {
+			Action::Up(av) => {
+				if state.row == 0 {
+					av.probability * (av.reward + state.value)
+				}
+				else {
+					av.probability * (av.reward + self.states[state.col as usize][(state.row - 1) as usize].value)
+				}	
+			},
+			Action::Right(av) => {
+				if state.col == (self.num_cols - 1) {
+					av.probability * (av.reward + state.value)
+				}
+				else {
+					av.probability * (av.reward + self.states[(state.col + 1) as usize][state.row as usize].value)
+				}	
+			},
+			Action::Down(av) => {
+				if state.row == (self.num_rows - 1) {
+					av.probability * (av.reward + state.value)
+				}
+				else {
+					av.probability * (av.reward + self.states[state.col as usize][(state.row + 1) as usize].value)
+				}	
+			},
+			Action::Left(av) => {
+				if state.col == 0 {
+					av.probability * (av.reward + state.value)
+				}
+				else {
+					av.probability * (av.reward + self.states[(state.col - 1) as usize][state.row as usize].value)
+				}	
+			},
 		}
-
-		if row < (self.num_cols - 1) as usize {
-			d = self.states[col][row + 1].value;
-		}
-
-		// let reward = self.states[col][row].reward as f32;
-
-		let next_value = u.max(r).max(d).max(l);
-		
-		next_value
 	}
 
 	pub fn draw(&self, graphics: &mut Graphics2D) {
@@ -241,19 +255,19 @@ impl Environment {
 	}
 
 	fn draw_grid(&self, graphics: &mut Graphics2D) {
-		// Draw vertical lines.
-		for x in 0..(self.num_cols + 1) {
-			let x = (self.x_offset + x * self.cell_size) as f32;
-			let begin = (x, self.y_offset as f32);
-			let end = (x, (self.y_offset + self.num_cols * self.cell_size) as f32);
+		// Draw horizontal lines.
+		for row in 0..(self.num_rows + 1) {
+			let y = (self.y_offset + row * self.cell_size) as f32;
+			let begin = (self.x_offset as f32, y);
+			let end = ((self.x_offset + self.num_rows * self.cell_size) as f32, y);
 			graphics.draw_line(begin, end, 1.0, Color::GRAY)
 		}
 
-		// Draw horizontal lines.
-		for y in 0..(self.num_rows + 1) {
-			let y = (self.y_offset + y * self.cell_size) as f32;
-			let begin = (self.x_offset as f32, y);
-			let end = ((self.x_offset + self.num_rows * self.cell_size) as f32, y);
+		// Draw vertical lines.
+		for col in 0..(self.num_cols + 1) {
+			let x = (self.x_offset + col * self.cell_size) as f32;
+			let begin = (x, self.y_offset as f32);
+			let end = (x, (self.y_offset + self.num_cols * self.cell_size) as f32);
 			graphics.draw_line(begin, end, 1.0, Color::GRAY)
 		}
 	}
