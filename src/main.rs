@@ -9,7 +9,7 @@ const NUM_Y_CELLS: u32 = 4;
 const X_OFFSET: u32 = 50;
 const Y_OFFSET: u32 = 50;
 const CELL_SIZE: u32 = 100;
-const TIME_STEP: bool = true;
+const TIME_STEP: bool = false;
 
 fn main() {
 	let x_dimension = NUM_X_CELLS * CELL_SIZE + 2 * X_OFFSET;

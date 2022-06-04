@@ -2,11 +2,12 @@ use speedy2d::{Graphics2D, color::Color, font::{Font, TextOptions, TextLayout}};
 
 #[derive(PartialEq)]
 pub enum Policy {
-	Iterative,
-	IterativeInPlace,
+	Iteration,
+	IterationInPlace,
+	ValueIteration,
 }
 
-const POLICY: Policy = Policy::Iterative; 
+const POLICY: Policy = Policy::ValueIteration; 
 const IMPROVE_POLICY: bool = true;
 
 #[derive(Copy, Clone, Debug)]
@@ -130,7 +131,18 @@ impl Environment {
 				if state.terminal() {
 					continue;
 				}
-				let next_value = self.get_next_value(state);
+
+				let next_value = match POLICY {
+					Policy::Iteration => {
+						self.get_expected_value(state)
+					},
+					Policy::IterationInPlace => {
+						self.get_expected_value(state)
+					},
+        			Policy::ValueIteration => {
+						self.get_greedy_value(state).unwrap()
+					},
+				};
 
 				// Did we converge?
 				if self.states[row as usize][col as usize].value != next_value {
@@ -138,20 +150,23 @@ impl Environment {
 				}
 
 				match POLICY {
-					Policy::Iterative => {
+					Policy::Iteration => {
 						self.states[row as usize][col as usize].next_value = next_value;
 					},
-					Policy::IterativeInPlace => {
+					Policy::IterationInPlace => {
 						self.states[row as usize][col as usize].value = next_value;
 					},
-				}
+        			Policy::ValueIteration => {
+						self.states[row as usize][col as usize].next_value = next_value;
+					},
+				};
 			}
 		}
 
-		// Copy new states into old states if Policy::Iterative
-		if POLICY == Policy::Iterative {
+		// Copy new states into old states
+		if POLICY == Policy::Iteration || POLICY == Policy::ValueIteration {
 			for row in 0..self.num_rows {
-				for col in 0..self.num_rows {
+				for col in 0..self.num_cols {
 					self.states[row as usize][col as usize].value = self.states[row as usize][col as usize].next_value;
 				}
 			}
@@ -180,13 +195,30 @@ impl Environment {
 		converged
 	}
 
-	fn get_next_value(& self, state: &State) -> f32 {
+	fn get_expected_value(& self, state: &State) -> f32 {
 		let mut value = 0.0;
 		for action in &state.actions {
 			value += self.get_action_value(state, action);
 		}
 
 		value
+	}
+
+	fn get_greedy_value(&self, state: &State) -> Option<f32> {
+		if state.actions.len() == 0 {
+			return None;
+		}
+
+		let mut value = -1000.0;
+		for action in &state.actions {
+			let current_value = self.get_action_value(state, action);
+
+			if current_value > value {
+				value = current_value;
+			}
+		}
+
+		Some(value)
 	}
 
 	fn get_greedy_action(&self, state: &State) -> Option<Action> {
@@ -199,15 +231,12 @@ impl Environment {
 		let mut greedy_action = first_action;
 		for action in &state.actions {
 			let current_value = self.get_action_value(state, action);
-			println!("Action = {:?} => {}", action, current_value); 
 
 			if current_value > value {
-				println!("Upgrading Action = {:?} => {} > {}", action, current_value, value); 
 				greedy_action = action;
 				value = current_value;
 			}
 		}
-		println!("Greedy Action = {:?}", greedy_action); 
 
 		Some(greedy_action.clone())
 	}
