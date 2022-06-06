@@ -195,10 +195,25 @@ impl Environment {
 		converged
 	}
 
-	fn get_expected_value(& self, state: &State) -> f32 {
+	fn get_expected_value(&self, state: &State) -> f32 {
 		let mut value = 0.0;
 		for action in &state.actions {
-			value += self.get_action_value(state, action);
+			let probability = match action {
+				Action::Up(av) => {
+					av.probability
+				},
+				Action::Right(av) => {
+					av.probability
+				},
+				Action::Down(av) => {
+					av.probability
+				},
+				Action::Left(av) => {
+					av.probability
+				},
+			};
+
+			value += probability * self.get_action_value(state, action)
 		}
 
 		value
@@ -241,38 +256,41 @@ impl Environment {
 		Some(greedy_action.clone())
 	}
 
+	// assumptions: 
+	//		- there is just deterministic state for each action
+	//		- trying to move outside a wall leaves you in the same state
 	fn get_action_value(&self, state: &State, action: &Action) -> f32 {
 		match action {
 			Action::Up(av) => {
 				if state.row == 0 {
-					av.probability * (av.reward + state.value)
+					av.reward + state.value
 				}
 				else {
-					av.probability * (av.reward + self.states[state.col as usize][(state.row - 1) as usize].value)
+					av.reward + self.states[state.col as usize][(state.row - 1) as usize].value
 				}	
 			},
 			Action::Right(av) => {
 				if state.col == (self.num_cols - 1) {
-					av.probability * (av.reward + state.value)
+					av.reward + state.value
 				}
 				else {
-					av.probability * (av.reward + self.states[(state.col + 1) as usize][state.row as usize].value)
+					av.reward + self.states[(state.col + 1) as usize][state.row as usize].value
 				}	
 			},
 			Action::Down(av) => {
 				if state.row == (self.num_rows - 1) {
-					av.probability * (av.reward + state.value)
+					av.reward + state.value
 				}
 				else {
-					av.probability * (av.reward + self.states[state.col as usize][(state.row + 1) as usize].value)
+					av.reward + self.states[state.col as usize][(state.row + 1) as usize].value
 				}	
 			},
 			Action::Left(av) => {
 				if state.col == 0 {
-					av.probability * (av.reward + state.value)
+					av.reward + state.value
 				}
 				else {
-					av.probability * (av.reward + self.states[(state.col - 1) as usize][state.row as usize].value)
+					av.reward + self.states[(state.col - 1) as usize][state.row as usize].value
 				}	
 			},
 		}

@@ -48,7 +48,7 @@ impl WindowHandler for Main {
 				self.converged = self.environment.act();
 				self.steps += 1;
 				if self.converged {
-					println!("Converged after {} steps.", self.steps);
+					println!("Converged after {} steps.", self.steps - 1);
 				} else {
 					println!("Steps: {}", self.steps);
 				}
@@ -67,7 +67,7 @@ impl WindowHandler for Main {
 		self.converged = self.environment.act();
 		self.steps += 1;
 		if self.converged {
-			println!("Converged after {} steps.", self.steps);
+			println!("Converged after {} steps.", self.steps - 1);
 		} else {
 			println!("Steps: {}", self.steps);
 		}
