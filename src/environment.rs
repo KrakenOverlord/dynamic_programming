@@ -116,7 +116,7 @@ impl Environment {
 
 		// initialize terminal states
 		states[0][0].actions = vec![];
-		states[3][3].actions = vec![];
+		// states[3][3].actions = vec![];
 
 		states
 	}
@@ -266,7 +266,7 @@ impl Environment {
 					av.reward + state.value
 				}
 				else {
-					av.reward + self.states[state.col as usize][(state.row - 1) as usize].value
+					av.reward + self.states[(state.row - 1) as usize][state.col as usize].value
 				}	
 			},
 			Action::Right(av) => {
@@ -274,7 +274,7 @@ impl Environment {
 					av.reward + state.value
 				}
 				else {
-					av.reward + self.states[(state.col + 1) as usize][state.row as usize].value
+					av.reward + self.states[(state.row) as usize][(state.col + 1) as usize].value
 				}	
 			},
 			Action::Down(av) => {
@@ -282,7 +282,7 @@ impl Environment {
 					av.reward + state.value
 				}
 				else {
-					av.reward + self.states[state.col as usize][(state.row + 1) as usize].value
+					av.reward + self.states[(state.row + 1) as usize][state.col as usize].value
 				}	
 			},
 			Action::Left(av) => {
@@ -290,7 +290,7 @@ impl Environment {
 					av.reward + state.value
 				}
 				else {
-					av.reward + self.states[(state.col - 1) as usize][state.row as usize].value
+					av.reward + self.states[state.row as usize][(state.col - 1) as usize].value
 				}	
 			},
 		}
@@ -306,7 +306,7 @@ impl Environment {
 		for row in 0..(self.num_rows + 1) {
 			let y = (self.y_offset + row * self.cell_size) as f32;
 			let begin = (self.x_offset as f32, y);
-			let end = ((self.x_offset + self.num_rows * self.cell_size) as f32, y);
+			let end = ((self.x_offset + self.num_cols * self.cell_size) as f32, y);
 			graphics.draw_line(begin, end, 1.0, Color::GRAY)
 		}
 
@@ -314,7 +314,7 @@ impl Environment {
 		for col in 0..(self.num_cols + 1) {
 			let x = (self.x_offset + col * self.cell_size) as f32;
 			let begin = (x, self.y_offset as f32);
-			let end = (x, (self.y_offset + self.num_cols * self.cell_size) as f32);
+			let end = (x, (self.y_offset + self.num_rows * self.cell_size) as f32);
 			graphics.draw_line(begin, end, 1.0, Color::GRAY)
 		}
 	}
